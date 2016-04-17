@@ -1,0 +1,3 @@
+1. How does weather change during a week in a station?
+2. Is the temperature about the same in different stations at the same time in a day?
+3. Which station has the highest temperature?
