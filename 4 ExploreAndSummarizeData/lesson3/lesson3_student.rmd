@@ -221,6 +221,14 @@ Notes:
 ***
 
 ### Transforming Data
+```{r}
+qplot(x = friend_count, data = pf)
+summary(pf$friend_count)
+summary(log10(pf$friend_count+1))
+summary(sqrt(pf$friend_count))
+```
+
+
 Notes:
 
 ***
@@ -229,7 +237,12 @@ Notes:
 Notes:
 
 ```{r Add a Scaling Layer}
-
+library(gridExtra)
+# g0 = qplot(x = friend_count, data = pf)
+g0 = ggplot(aes(x = friend_count), data = pf) + geom_histogram()
+g1 = g0 + scale_x_log10()
+g2 = g0 + scale_x_sqrt()
+grid.arrange(g0, g1, g2, ncol = 2)
 ```
 
 ***
@@ -238,7 +251,16 @@ Notes:
 ### Frequency Polygons
 
 ```{r Frequency Polygons}
+qplot(x = friend_count, data = subset(pf, !is.na(gender)),
+      binwidth = 10, geom = 'freqpoly', color = gender) +
+  scale_x_continuous(limits = c(0, 1000), breaks = seq(0, 1000, 50))
 
+ggplot(aes(x = friend_count, y = ..count../sum(..count..)), 
+       data = subset(pf, !is.na(gender))) +
+  geom_freqpoly(aes(color = gender), binwidth = 10) +
+  scale_x_continuous(limits = c(0, 1000), breaks = seq(0, 1000, 50)) +
+  xlab('Friend count') +
+  ylab('Percentage of users with that friend count')
 ```
 
 ***
@@ -247,9 +269,14 @@ Notes:
 Notes:
 
 ```{r Likes on the Web}
-
+ggplot(aes(x=www_likes), data = subset(pf, !is.na(gender))) +
+  geom_freqpoly(aes(color = gender)) +
+  scale_x_log10()
 ```
-
+### Likes on the Web solution
+```{r}
+by(pf$www_likes, pf$gender, sum)
+```
 
 ***
 
@@ -257,7 +284,15 @@ Notes:
 Notes:
 
 ```{r Box Plots}
+qplot(x=gender, y=friend_count, 
+      data=subset(pf, !is.na(gender)),
+      geom = 'boxplot') +
+  scale_y_continuous(limits = c(0, 1000))
 
+qplot(x=gender, y=friend_count, 
+      data=subset(pf, !is.na(gender)),
+      geom = 'boxplot') +
+  coord_cartesian(ylim = c(0, 1000))
 ```
 
 #### Adjust the code to focus on users who have friend counts between 0 and 1000.
@@ -279,8 +314,11 @@ Notes:
 Response:
 #### Write about some ways that you can verify your answer.
 Response:
+Calculate the total number of users who initiated friendships.
+This is reflected in the data by counting the users whose friendships_initiated > 0.
 ```{r Friend Requests by Gender}
-
+qplot(aes(x = gender, y = friendships_initiated, 
+          data = subset(pf, !is.na(gender))))
 ```
 
 Response:
