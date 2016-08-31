@@ -292,7 +292,9 @@ qplot(x=gender, y=friend_count,
 qplot(x=gender, y=friend_count, 
       data=subset(pf, !is.na(gender)),
       geom = 'boxplot') +
-  coord_cartesian(ylim = c(0, 1000))
+  coord_cartesian(ylim = c(0, 250))
+
+by(pf$friend_count, pf$gender, summary)
 ```
 
 #### Adjust the code to focus on users who have friend counts between 0 and 1000.
@@ -310,15 +312,20 @@ Notes:
 
 ```
 
-#### On average, who initiated more friendships in our sample: men or women?
+#### On average, Who made more friend requests - men or women?
 Response:
 #### Write about some ways that you can verify your answer.
 Response:
 Calculate the total number of users who initiated friendships.
 This is reflected in the data by counting the users whose friendships_initiated > 0.
 ```{r Friend Requests by Gender}
-qplot(aes(x = gender, y = friendships_initiated, 
-          data = subset(pf, !is.na(gender))))
+qplot(x = gender, y = friendships_initiated, 
+      data = subset(pf, !is.na(gender)),
+      geom = 'boxplot') +
+  coord_cartesian(ylim = c(0, 200))
+
+by(pf$friendships_initiated, pf$gender, summary)
+
 ```
 
 Response:
@@ -329,11 +336,22 @@ Response:
 Notes:
 
 ```{r Getting Logical}
+summary(pf$mobile_likes)
+summary(pf$mobile_likes > 0)
+pf$mobile_check_in <- NA
+
+pf$mobile_check_in <- ifelse(pf$mobile_likes > 0, 1, 0)
+pf$mobile_check_in <- factor(pf$mobile_check_in)
+summary(pf$mobile_check_in)
 
 ```
 
-Response:
+What percent of check in using mobile?
 
+Response:
+```{r}
+sum(pf$mobile_check_in == 1)/length(pf$mobile_check_in)
+```
 ***
 
 ### Analyzing One Variable
