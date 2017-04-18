@@ -1,5 +1,7 @@
 # Pre-requisite
 library(ggplot2)
+library(dplyr)
+library(gridExtra)
 data("diamonds")
 
 # ----------------------------------- 1 ---------------------------------------
@@ -90,20 +92,72 @@ cor(df$volume, df$price)
 # Instructor Notes or look up the documentation of
 # geom_smooth() for more details about smoothers.)
 # Do you think this would be a useful model to estimate
-# the price of diamonds? Why or why not?
+# the price of diamonds? Why or why not? No, because the line is biased towards
+# the outliers on the right hand side.
 # =============================================================================
+df <- diamonds[(diamonds$volume != 0 & diamonds$volume < 800), ]
+ggplot(data = df, mapping = aes(x = volume, y = price)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "lm")
 
 # ----------------------------------- 12 --------------------------------------
+# Use the function dplyr package to create a new data frame containing
+# info on diamonds by clarity. Name the data frame diamondsByClarity
+# The data frame should contain the following variables in this order.
+#       (1) mean_price
+#       (2) median_price
+#       (3) min_price
+#       (4) max_price
+#       (5) n
+# where n is the number of diamonds in each level of clarity.
 # =============================================================================
+diamondsByClarity <- summarise(group_by(diamonds, clarity), 
+                               mean_price = mean(price),
+                               median_price = median(price),
+                               min_price = min(price),
+                               max_price = max(price),
+                               n = n())
 
 # ----------------------------------- 13 --------------------------------------
+# We've created summary data frames with the mean price
+# by clarity and color. You can run the code in R to
+# verify what data is in the variables diamonds_mp_by_clarity
+# and diamonds_mp_by_color.
+# Your task is to write additional code to create two bar plots
+# on one output image using the grid.arrange() function from the package
+# gridExtra.
 # =============================================================================
+diamonds_mp_by_clarity <- summarise(group_by(diamonds, clarity), 
+                                    mean_price = mean(price))
+
+diamonds_mp_by_color <- summarise(group_by(diamonds, color), 
+                                  mean_price = mean(price))
+
+p1 <- ggplot(data = diamonds_mp_by_clarity, mapping = aes(x = clarity,
+                                                          y = mean_price)) +
+  geom_col()
+
+p2 <- ggplot(data = diamonds_mp_by_color, mapping = aes(x = color,
+                                                          y = mean_price)) +
+  geom_col()
+
+grid.arrange(p1, p2, ncol = 2)
 
 # ----------------------------------- 14 --------------------------------------
+# What do you notice in each of the bar charts for mean price by clarity and 
+# mean price by color?
+# These trends seem to go against our intuition.
+# Mean price tends to decrease as clarity improves. 
+# The same can be said for color.
 # =============================================================================
 
 # ----------------------------------- 15 --------------------------------------
-# =============================================================================
-
-# ----------------------------------- 16 --------------------------------------
+# The Gapminder website contains over 500 data sets with information about
+# the world's population. Your task is to continue the investigation you did at the
+# end of Problem Set 3 or you can start fresh and choose a different
+# data set from Gapminder.
+# If you're feeling adventurous or want to try some data munging see if you can
+# find a data set or scrape one from the web.
+# In your investigation, examine pairs of variable and create 2-5 plots that make
+# use of the techniques from Lesson 4.
 # =============================================================================

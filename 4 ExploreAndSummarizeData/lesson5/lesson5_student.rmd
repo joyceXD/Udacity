@@ -71,9 +71,20 @@ Notes:
 
 ### Cut a Variable
 Notes:
+# Create a new variable in the data frame
+# called year_joined.bucket by using
+# the cut function on the variable year_joined.
+# You need to create the following buckets for the
+# new variable, year_joined.bucket
 
+#        (2004, 2009]
+#        (2009, 2011]
+#        (2011, 2012]
+#        (2012, 2014]
 ```{r Cut a Variable}
-
+pf <- read.delim('../pseudo_facebook.tsv')
+pf$year_joined <- floor(2014 - pf$tenure / 365)
+pf$year_joined.bucket <- cut(pf$year_joined, c(2004, 2009, 2011, 2012, 2014))
 ```
 
 ***
@@ -82,7 +93,9 @@ Notes:
 Notes:
 
 ```{r Plotting it All Together}
-
+ggplot(aes(x = age, y = friend_count), 
+              data = subset(pf, !is.na(year_joined.bucket))) + 
+  geom_line(aes(color = year_joined.bucket), stat = 'summary', fun.y = median)
 ```
 
 ***
