@@ -1,0 +1,4 @@
+*.pyc
+
+./5_IdentifyFraudFromEnronEmail/maildir
+./5_IdentifyFraudFromEnronEmail/text_learning/your_word_data.pkl

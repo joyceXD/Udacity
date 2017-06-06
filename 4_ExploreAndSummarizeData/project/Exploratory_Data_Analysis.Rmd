@@ -1,0 +1,801 @@
+---
+title: "Analyzing Loan Data from Prosper"
+author: "Yi Xu"
+output:
+  html_document:
+    self_contained: no
+---
+# Introduction
+==================
+
+The dataset investigated is from Prosper, which is a peer-to-peer money investing or borrowing website. It works in the following way: borrowers choose loan amount, purpose and post a loan listing; investors review loan listings and invest in listings they are interested in; once the process is complete, borrowers make fixed monthly payments and investors receive a portion of those payments directly to their Prosper account.
+
+My main goals for this exploratory data analysis is two folds. The first one is to understand some of the variables and visualize the distribution. The second one is try to find possbile correlations among the variables.
+
+The methodology is through univariate, bivariate and multivariate analysis. The tool I will be using is R's visualization package ggplot2 and linear model.
+
+
+
+# Overview of the data
+==================
+
+Firstly, load in the necessary packages.
+Then, read data into RStudio. We can see that the file has 113937 observations and 81 variables.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+library(dplyr)
+library(ggplot2)
+library(rMaps)
+library(lubridate)
+library(RColorBrewer)
+library(GGally)
+library(reshape2)
+library(memisc)
+library(knitr)
+```
+
+The names of the variables are also listed here.
+
+```{r echo=FALSE, Load_the_Data}
+prosper = tbl_df(read.csv("prosperLoanData.csv", stringsAsFactors = FALSE))
+dim(prosper)
+names(prosper)
+```
+
+Now let's look at the structure of this dataset.
+
+```{r data_structure, echo=FALSE}
+str(prosper)
+```
+
+# Univariate Analysis
+==================
+
+### What is the structure of your dataset?
+
+This dataset has 113937 observations and 81 variables. There are some numeric variables(e.g., LenderYield, BorrowerRate, etc). There are also some factor variables (e.g., ProsperRating, IncomeRange). I refactored IncomeRange, ProsperRating..Alpha. and ListingCategory..numeric. to better understand the dataset.
+
+
+The first thinkg I would like to explore is the income range of the borrowers. We could see that most of the borrowers have income ranging from $25,000 to $75,000.
+
+```{r IncomeRange, cache=TRUE, echo=FALSE}
+prosper$IncomeRange = factor(prosper$IncomeRange, 
+                             levels=c("Not employed", "$0", "$1-24,999", 
+                                    "$25,000-49,999", "$50,000-74,999", 
+                                    "$75,000-99,999", "$100,000+", 
+                                    "Not displayed"))
+ggplot(data = prosper, aes(x = IncomeRange)) + 
+        geom_bar(color = "black", fill = "cyan") + 
+        theme(axis.text.x  = element_text(angle=60, vjust=0.6)) +
+        ggtitle("Income range of the borrowers")
+```
+
+Next I check how many of the incomes are verifiable.
+
+```{r IncomeVerifiable, cache=TRUE, echo=FALSE}
+prosper$IncomeVerifiable = as.factor(prosper$IncomeVerifiable)
+ggplot(data = prosper, aes(x = IncomeVerifiable)) + 
+        geom_bar(color = "black", fill = "cyan") +
+        ggtitle("Income Verifiable?")
+```
+
+We can see that about 92.4% of incomes are verifiable. So we could trust the income range.
+
+Another interesting variable is DebtToIncomeRatio, which shows the debt to income ratio when the borrower's profile was pulled.
+
+```{r plot1, cache=TRUE,echo=FALSE}
+ggplot(data = prosper, aes(x = DebtToIncomeRatio)) +                
+        geom_histogram(color = "black", fill = "cyan", binwidth = 0.02) +
+        xlab("Ratio") +
+        xlim(0, quantile(prosper$DebtToIncomeRatio, prob = 0.99, na.rm=TRUE)) +
+        ggtitle("Debt To Income Ratio")
+```
+
+We could see from the above histogram that most of the borrowers keep the ratio well below 50%.
+
+Now I want to see the rating given by Prosper towards the buyers. There are two kinds of rating provided by Prosper: one is in the numeric form, the other is in the letter form. We could see from the following comparison that either form has 29084 missing values. So I just pick the letter form randomly. Note that here, rating "AA" is the best rating, while "HR" is the worst rating.
+
+```{r ratings, cache=TRUE, echo=FALSE}
+prosper$ProsperRating_n = prosper$ProsperRating..numeric.
+prosper$ProsperRating_a = factor(prosper$ProsperRating..Alpha.,
+                                 levels = c("AA","A","B","C","D","E","HR",""))
+summary(prosper$ProsperRating_n)
+table(prosper$ProsperRating_a)
+```
+
+We could see that most of the borrowers don't have ratings. This is because borrower rating was introduced in July 2009. For the borrowers who have ratings, most of them are rated as "A", "B", "C" or "D".
+
+```{r plot2, cache=TRUE, echo=FALSE}
+ggplot(data = prosper, aes(x = ProsperRating_a)) + 
+        geom_bar(color = "black", fill = "cyan") + 
+        theme(axis.text.x = element_text(angle = 60, vjust = 0.6)) +
+        xlab("Rating") + ggtitle("Borrower Rating from Prosper")
+```
+
+Another variable similar to Prosper's borrower rating is Prosper's score towards each borrower, which is the risk built using historical Prosper data. The documentation says the score ranges from 1 to 10, with 10 being the best, or lowest risk score. However, there are the score ranges from 1 to 11 in the dataset.
+
+```{r plot3, cache=TRUE,echo=FALSE}
+prosper$ProsperScore = factor(prosper$ProsperScore)
+ggplot(data = prosper, aes(x = ProsperScore)) + 
+        geom_bar(color = "black", fill = "cyan") +
+        theme(axis.text.x = element_text(angle = 60, vjust = 0.6)) +
+        xlab("Score") + ggtitle("Borrower Score from Prosper")
+```
+
+We can see that except for the missing values, borrowers' score are approximately normally distributed. Most of the borrowers have score ranging from 4 to 8. 
+
+Since we also have borrower's credit score from credit rating angecies, let's investigate it.
+
+```{r plot4, cache=TRUE, echo=FALSE}
+ggplot(data = prosper, aes(x = CreditScoreRangeLower)) +
+        geom_histogram(color = "black", fill = "yellow", binwidth = 20) + 
+        xlab("Credit Score") +
+        ggtitle("Borrower's Credit Score Lower Range")
+ggplot(data = prosper, aes(x = CreditScoreRangeUpper)) +
+        geom_histogram(color = "black", fill = "yellow", binwidth = 20) +
+        xlab("Credit Score") +
+        ggtitle("Borrower's Credit Score Upper Range")
+```
+
+Surprisingly, the lower and upper range of the borrower's credit score resemble each other. It appears to me that in order to get a Prosper loan, you'd better have a credit score over 620. We also note that there are some outliers near 0. According to [5], that means the borrower doesn't have any history of borrowing and paying off. As noted in [5], the credit score usually runs from 300 to 850. However, we can see that the Lower Range of Credit Score in this dataset is from 0 to 880, and the Upper Range of Credit Score in this dataset is from 19 to 899.
+
+```{r plot4_2, cache=TRUE, echo=FALSE}
+summary(prosper$CreditScoreRangeLower)
+```
+
+```{r plot4_3, cache=TRUE, echo=FALSE}
+summary(prosper$CreditScoreRangeUpper)
+```
+
+To focus on the normal range, I limit the x-axis from 300 to 850.
+
+```{r plot4_4, cache=TRUE, echo=FALSE}
+ggplot(data = prosper, aes(x = CreditScoreRangeLower)) +
+        geom_histogram(color = "black", fill = "yellow", binwidth = 20) + 
+        xlab("Credit Score") +
+        xlim(300, 850) +
+        ggtitle("Borrower's Credit Score Lower Range Normal Part")
+ggplot(data = prosper, aes(x = CreditScoreRangeUpper)) +
+        geom_histogram(color = "black", fill = "yellow", binwidth = 20) +
+        xlab("Credit Score") +
+        xlim(300, 850) +
+        ggtitle("Borrower's Credit Score Upper Range Normal Part")
+```
+
+Now it becomes clear that most of the borrower has credit score around 670 to 720, which falls into the category of good according to [6].
+
+Next I would like to know the purpose of the loans. Therefore I investigate the listing category variable.
+
+```{r Category, cache=TRUE,echo=FALSE, warning=FALSE}
+str(prosper$ListingCategory..numeric.)
+prosper$ListingCategory = factor(prosper$ListingCategory..numeric.,
+                                 levels = c(1:6,8:20,7,0),
+                                 labels = c('Debt Consolidation',
+                                 'Home Improvement', 
+                                 'Business', 
+                                 'Personal Loan', 
+                                 'Student Use', 
+                                 'Auto', 
+                                 'Baby & Adoption',
+                                 'Boat', 
+                                 'Cosmetic Procedure', 
+                                 'Engagement Ring', 
+                                 'Green Loans', 
+                                 'Household Expenses', 
+                                 'Large Purchases', 
+                                 'Medical/Dental', 
+                                 'Motorcycle', 'RV',
+                                 'Taxes', 'Vacation',
+                                 'Wedding Loans', 
+                                 'Other', 
+                                 'Not Available'))
+
+ggplot(data = prosper, aes(x = ListingCategory, ymax = max(..count..)*1.05)) +
+        geom_bar(fill="cyan") +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.6)) + 
+        stat_bin(geom="text", binwidth = 500, size = 3,
+                 aes(label=..count.., vjust=-0.9, hjust=0.5)) +
+        ggtitle("The Purpose of the Loan Listing")
+```
+
+From the above figure, we could tell that most loans on Prosper are for Debt Consolidation. Excluding the Not Available and Other purposes, most of the loans go into Home Improvement, Business, Auto, and Personal Loan. Categories like RV (recreatonal vehicle), Boat,  Vacation only account a small portion of the loan. Therefore, I conclude that most the people borrow money for necessary needs while not for entainment.
+
+Since borrowers' interest rate is an important factor, let's take a look at this variable.
+
+```{r plot5, cache=TRUE,echo=FALSE}
+ggplot(data = prosper, aes(x = BorrowerRate)) + 
+        geom_histogram(color = "black", fill = "lightblue", binwidth = 0.01) +
+        xlab("Rate") +
+        ggtitle("Borrowers' Rate Distribution")
+```
+
+```{r plot5_2, cache=TRUE,echo=FALSE}
+mean(prosper$BorrowerRate)
+sd(prosper$BorrowerRate)
+```
+
+We could see that the rate approximately follows a normal distribution with mean around 0.19 and standard deviation of 0.075.
+
+The length of a loan is also an important factor for both the borrower and investor. So let's take a look at this variable.
+
+```{r Term, cache=TRUE,echo=FALSE}
+prosper$Term = as.factor(prosper$Term)
+ggplot(data = prosper, aes(x = Term, ymax = max(..count..)*1.05)) + 
+        geom_bar(fill = "cyan") +
+        stat_bin(geom="text", size = 4,
+                 aes(label=..count.., vjust=-0.9, hjust=0.5))+
+        ggtitle("Length of the Loan")
+```
+
+We could see from this barplot that the majority of the loans has the length of 36 months. About 20% of loans have length of 60 months. Only 1.4% of the loans have length of 12 months.
+
+Next, I want to investigate the delinquent amount of the borrower.
+
+```{r plot6,cache=TRUE,echo=FALSE, warning=FALSE}
+ggplot(data = prosper, aes(x = AmountDelinquent)) +
+        geom_histogram(color = "black", fill = "cyan", binwidth = 100) +
+        xlim(0, quantile(prosper$AmountDelinquent, 0.95, na.rm=TRUE)) +
+        xlab("Amount in Dollars") +
+        ggtitle("Delinquent Amount")
+```
+
+```{r plot6_3,cache=TRUE,echo=FALSE, warning=FALSE}
+dim(prosper[prosper$AmountDelinquent==0,])
+```
+
+We can see that the delinquent amount is heavily right skewed with 97440 entries the of data equal to 0. So let's make another plot.
+
+```{r plot6_4,cache=TRUE,echo=FALSE, warning=FALSE}
+ggplot(data = prosper, aes(x = AmountDelinquent)) +
+        geom_histogram(color = "black", fill = "cyan", binwidth = 30) +
+        xlim(10, 3000) +
+        xlab("Amount in Dollars") +
+        ggtitle("Delinquent Amount Excluding Zero Dollar")
+```
+
+We can see that except for the borrowers with no delinquent amount, most other borrowers have less than $500 delinquent amount.
+
+Now, let's look at the borrower's geographical informaiton. I first count the number of borrowers in each state, then color the map according to this number.
+
+```{r State,cache=TRUE,echo=FALSE}
+prosper$BorrowerState = as.factor(prosper$BorrowerState)
+```
+
+
+```{r StateMap, cache=TRUE,echo=FALSE}
+borrower_state_info = prosper %>%
+        group_by(BorrowerState) %>%
+        summarise(n = n()) %>%
+        arrange(desc(n))
+```
+
+```{r statemap1, results='asis', cache=TRUE,echo=FALSE}
+borrower_state_map = 
+        ichoropleth(n ~ BorrowerState, data = borrower_state_info,
+                    ncuts = 5, pal = 'PuRd', 
+                    geographyConfig = list(
+                            popupTemplate = "#!function(geo, data) {
+                            return '<div class=\"hoverinfo\"><strong>' +
+                            data.BorrowerState + '<br>' + data.n +
+                            '</strong></div>';}!#"))
+print(borrower_state_map)
+```
+
+As we can see from this map, California, Texas, Georgia, Florida, and New York have the most borrowers. These are the most populous and economically prosperous areas as well.
+
+Recommendation is also an important factor for loans. 
+
+```{r plot7, cache=TRUE, echo=FALSE}
+ggplot(data = prosper, aes(x = Recommendations)) + 
+        geom_histogram(binwidth = 1, color = "black", fill = "cyan") +        
+        xlab("Recommendation Count") +
+        ggtitle("Number of Recommendations of Loan")
+```
+
+```{r plot7_2, cache=TRUE, echo=FALSE}
+summary(prosper$Recommendations)
+```
+
+```{r plot7_3, cache=TRUE, echo=FALSE}
+dim(prosper[prosper$Recommendations==0,])
+dim(prosper[prosper$Recommendations==1,])
+dim(prosper[prosper$Recommendations==2,])
+```
+
+We can see that most loans (109678/113937) do not have any recommendations, 3516 out of 113937 loans have only 1 recommendations, 568 out 113937 have 2 recommendations. Others are plot
+
+```{r plot7_4, cache=TRUE, echo=FALSE}
+ggplot(data = prosper, aes(x = Recommendations)) + 
+        geom_histogram(binwidth = 1, color = "black", fill = "cyan") +
+        xlim(3,40) +
+        xlab("Recommendation Count") +
+        ggtitle("Loans with at least three recommendations")
+```
+
+We may also take a look at the number of investors of each loan.
+
+```{r Investors, cache=TRUE, echo=FALSE}
+ggplot(data = prosper, aes(x = Investors)) + 
+        geom_histogram(binwidth = 50, color = "black", fill = "cyan") +        
+        ggtitle("Number of Investors of Loan")
+```
+
+We can see that this data right skewed. Most of the loans have less than 50 investors.
+
+
+
+Finally, let's look at the lenders' profit, which is contained in the variable LenderYield.
+
+```{r plot8, cache=TRUE, echo=FALSE}
+ggplot(data = prosper, aes(x = LenderYield)) +
+        geom_histogram(color = "black", fill = "cyan", binwidth = 0.01) + 
+        xlab("Yield") +
+        ggtitle("Lenders' Yield")
+```
+
+Comparing this histogram to the Borrowers' rate histogram, I find them to be nearly identical.
+
+
+
+### What is/are the main feature(s) of interest in your dataset?
+
+I'm mainly interested in LenderYield and BorrowerRate, since as a lender, the most important thing one cares about is how much will he earn; as a borrower, one cares about how much interests he will pay for. I want to know which variables or factors have impact on these two variables.
+
+### What other features in the dataset do you think will help support your investigation into your feature(s) of interest?
+
+Intuitively, ProsperRating will have big impacts on the outcome of LenderYield and BorrowerRate, since lending money to lower rating borrower may have higher risks. Moreover, I think IncomeRange, Term, DebtToIncomeRatio, CreditScore, and AmountDelinquent may help me investigate the LenderYield and BorrowerRate. 
+
+### Did you create any new variables from existing variables in the dataset?
+
+Yes, I counted the number of borrowers in each state. I want to see the distribution of the number of borrowers across the states. I also want to investigate whether state is a influential variable.
+
+### Of the features you investigated, were there any unusual distributions? Did you perform any operations on the data to tidy, adjust, or change the form of the data? If so, why did you do this?
+
+The AmountDelinquent and the number of Recommendations are heavily right skewed. Since the majority of these two variables are 0, it would not be appropriate to conduct log transformation. Thus, I didn't perform any operations. But I tuned some parameters when performing data visualization.
+
+
+
+# Bivariate Analysis
+==================
+
+I first look into the relationship between the length of a loan and the yield of the lender.
+
+```{r plot9, echo=FALSE, cache=TRUE}
+ggplot(data = prosper, aes(x = LenderYield)) +
+        geom_histogram(color = "black", fill = "cyan",binwidth = 0.01) + 
+        facet_wrap(~Term, ncol = 1) +
+        xlab("Yield") +
+        ggtitle("Lender's Yield of Different Terms")
+```
+
+We could see that most of the loads are for 36 months. And 36 months also have very high return, such as 0.3 compared to other two terms. Given that 36-month is much shorter than 60-month, and 36-month even has higher return rate, I would suggest the lenders putting their money into 36-month loans. Since on the above plot, we could not clearly see the count for 12-month term, I made another plot below which provided a finer look for the term of 12 months.
+
+```{r plot9_2, echo=FALSE, cache=TRUE}
+ggplot(data = subset(prosper, Term == 12), aes(x = LenderYield)) +
+        geom_histogram(color = "black", fill = "cyan",binwidth = 0.01) + 
+        xlab("Yield") +
+        ggtitle("Lender's Yield for 12-Month Terms")
+```
+
+
+Next, I look at the borrower's rate with different income range.
+
+```{r plot10, echo=FALSE, cache=TRUE}
+ggplot(data = prosper, aes(x = BorrowerRate, fill = IncomeRange)) +
+        geom_histogram(binwidth = 0.01) +         
+        facet_wrap(~IncomeRange, ncol = 2) +
+        xlab("Rate") + 
+        ggtitle("Borrower's Rate of Different Income Range")
+```
+
+```{r plot10_2, echo=FALSE, cache=TRUE}
+ggplot(data = subset(prosper, IncomeRange == "Not employed"), 
+       aes(x = BorrowerRate)) +
+        geom_histogram(binwidth = 0.01, color = "black", fill = "yellow") +                 
+        xlab("Rate") + 
+        ggtitle("Borrower's Rate for Not Employed")
+```
+
+```{r plot10_3, echo=FALSE, cache=TRUE}
+ggplot(data = subset(prosper, IncomeRange == "$0"), 
+       aes(x = BorrowerRate, fill = IncomeRange)) +
+        geom_histogram(binwidth = 0.01, color = "black", fill = "yellow") +                 
+        xlab("Rate") + 
+        ggtitle("Borrower's Rate for $0 Income")
+```
+
+Mean BorrowerRate of different IncomeRange:
+
+```{r plot10_4, echo=FALSE, cache=TRUE}
+tapply(prosper$BorrowerRate, prosper$IncomeRange, mean)
+```
+
+We could see from these plots and the mean that within each income range, the rate seems to be normally distributed. About half of the borrowers in each income range have rate less than 0.2, and the other half greater than 0.2.
+
+Now I check the relationship between the delinquent amount and income range.
+
+```{r plot11, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = prosper, aes(x = AmountDelinquent, fill = IncomeRange)) +
+        geom_density() +         
+        xlab("Amount in Dollars") + 
+        facet_wrap(~IncomeRange, ncol = 2) +
+        coord_cartesian(xlim = c(0, quantile(prosper$AmountDelinquent, 0.99, na.rm = TRUE))) +
+        ggtitle("Delinquent Amount with Different Income Range")
+```
+
+We could see that among different income ranges, there are no big differences. All of income levels have small delinquent amount.
+
+Let's see how the number of investors and the lender yield are correlated.
+
+```{r plot12, echo=FALSE, cache=TRUE}
+ggplot(data = prosper, aes(x = Investors, y = LenderYield)) +
+        geom_jitter(alpha = 0.01) +
+        stat_smooth()+        
+        ggtitle("Lender Yield Vs Number of Investors")
+```
+
+According to the above scatter plot, it seems that there is no strong correlation between these two variables. We could calculate their correlations as follows.
+
+```{r correlation1, echo=FALSE, cache=TRUE}
+with(prosper, cor(Investors, LenderYield))
+```
+
+The result is -0.2741739, which indicates that the correlation is not very strong.
+
+Does different states have different yields?
+
+```{r statemap2, results='asis', cache=TRUE, echo=FALSE, fig.keep='all'}
+lenderyield_state_info = prosper %>%
+        group_by(BorrowerState) %>%
+        summarise(mean_yield = mean(LenderYield)) 
+
+lenderyield_state_map = 
+    ichoropleth(mean_yield ~ BorrowerState, data = lenderyield_state_info,
+                ncuts = 5, pal = 'Greens', 
+                geographyConfig = list(
+                        popupTemplate = "#!function(geo, data) {
+                        return '<div class=\"hoverinfo\"><strong>' +
+                        data.BorrowerState +
+                        '<br>' + data.mean_yield +
+                        '</strong></div>';}!#"))
+
+print(lenderyield_state_map)
+```
+
+From the above plot, we can see that states in the south, e.g., Mississippi, Alabama, Arkansas, Tennessee have very high yields on average. States in the middle, for instance, Colorado, Oklahoma, Kansas, Nebraska have slightly lower yield.
+
+
+Now let's look at the relationship between lender yield and the score from Prosper.
+In common sense, investors want to lend their money to someone trustable. 
+
+```{r plot13, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = prosper, aes(x = ProsperScore, y = LenderYield)) +
+        geom_boxplot(aes(fill = ProsperScore)) +
+        xlab("Score") +
+        ggtitle("Yield for Different Prosper Score")
+```
+
+From the boxplot above, we could see that, except for some outliers, lending money to the borrower of low Prosper score seems to yield higher return. To confirm this, let's look at the relationship between the Prosper rating and lender yield.
+
+```{r plot14, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = prosper, aes(x = ProsperRating_a, y = LenderYield)) +
+        geom_boxplot(aes(fill = ProsperRating_a)) +
+        xlab("Prosper Rating") +
+        ggtitle("Yield for Different Prosper Rating")
+```
+
+Since AA is the highest rating and HR is lowest rating, the same conclusion holds. That is lending money to low rating borrowers will produce higher returns. This is very interesting and kind of counter-intuitive. However, after careful thought, I think it also makes sense. Since when Prosper lend money to the lowe rating borrowers, they will set higher APR to compensate for the high risk of not getting money back. The following plot shows the different APR for different rating borrowers.
+
+
+```{r plot15, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = prosper, aes(x = ProsperRating_a, y = BorrowerAPR)) +
+        geom_boxplot(aes(fill = ProsperRating_a)) +
+        xlab("Prosper Rating") +
+        ggtitle("APR for Different Prosper Rating")
+```
+
+Therefore, we could conclude that lending money to low rating borrower could give us higher return.
+
+How about different listing categories?
+
+```{r plot16, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = prosper, aes(x = ListingCategory, y = LenderYield)) +
+        geom_boxplot(aes(fill = ListingCategory)) +
+        xlab("Category") +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.6)) +
+        ggtitle("Lender Yield for Different Listing Category")
+```
+
+From this boxplot, it seems that there is not clear relationship between these two variables.
+Can the delinquent amount serve as a good indicator for lender yield?
+
+```{r plot17, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = subset(prosper, LenderYield <= 0.38 & AmountDelinquent <= 3e+05), 
+       aes(x = LenderYield, y = AmountDelinquent)) +
+        geom_jitter(alpha = 0.1) +
+        coord_cartesian(ylim = c(0, 1e+05)) + 
+        stat_smooth() +
+        xlab("LenderYield") +
+        ggtitle("Lender Yield Vs Delinquent Amount")
+```
+
+Since there are not many borrowers with delinquent amount larger than 0, it seems that there is a weak relationship between these two variables.
+
+```{r correlation2, echo=FALSE, cache=TRUE}
+with(subset(prosper, !is.na(AmountDelinquent)), cor(AmountDelinquent, LenderYield))
+```
+
+Ignoring the missing values, we can actually calculate this number, which turns out to be a small number 0.0650208.
+
+How about the number of recommendations? Does more recommendations usually result in higher return?
+
+```{r plot18, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = subset(prosper, Recommendations <=20), 
+       aes(x = LenderYield, y = Recommendations)) +
+        geom_jitter(alpha = 0.1) +
+        stat_smooth() +        
+        xlab("Lender Yield") +
+        ggtitle("Lender Yield Vs Number of Recommendations")
+```
+
+From this scatter plot, it appears to me that more recommendations do not always have high return.
+
+```{r correlation3, echo=FALSE, cache=TRUE}
+with(prosper, cor(Recommendations, LenderYield))
+```
+
+By explicitly calculating their correlation, we can see that it is very small.
+
+
+Lastly, how about the borrower's debt to income ratio? Can we lend our money to someone with high debt to income ratio?
+
+```{r plot19, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = prosper, aes(x = DebtToIncomeRatio, y = LenderYield)) +
+        geom_jitter(alpha = 0.1) +
+        stat_smooth()+
+        xlab("Ratio") +
+        ggtitle("Lender Yield Vs Borrower's Debt to Income Ratio")
+```
+
+```{r correlation4, echo=FALSE, cache=TRUE}
+with(subset(prosper, !is.na(DebtToIncomeRatio)), cor(DebtToIncomeRatio, LenderYield))
+```
+
+We could see that the bulk of the borrowers has debt to income ratio less than 1. And it seems that there is a little correlation between DebtToIncomeRatio and LenderYield.
+
+
+### Talk about some of the relationships you observed in this part of the investigation. How did the feature(s) of interest vary with other features in the dataset?
+
+I first found that LenderYield is related to the length of the loan. 36-month and 60-month loans tend to have higher return than the 12-month loan. I then discovered that borrowers from different state had different average return. Particularly, states in the south, e.g., Mississippi, Alabama, Arkansas, Tennessee have very high yields on average. I also noticed that lending money to the borrower of low Prosper score (or low Prosper rating) seemed to yield higher return.  
+
+### Did you observe any interesting relationships between the other features (not the main feature(s) of interest)?
+
+Prosper score and Prosper rating are clearly correlated, since they are just different representations of the same thing. Except this, I didn't find any other interesting relationships between the other features.
+
+### What was the strongest relationship you found?
+
+The strongest relationship I found was LenderYied and Prosperrating. As we could see from the plots, except for the outliers, borrowers with different ratings tend to have different returns.
+
+
+
+# Multivariate Analysis
+==================
+
+Firstly, let's see if the number of investor for different income range borrowers have impacts on the returns?
+
+```{r plot20, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = subset(prosper, IncomeRange != "Not employed" & 
+                             IncomeRange != "Not displayed"), 
+       aes(x = Investors, y = LenderYield, color = IncomeRange)) +
+        geom_jitter(alpha = 0.2) +
+        scale_color_brewer(type = "seq", palette = "Blues") +
+        xlab("Number of Investors") +
+        ggtitle("Lender Yield Vs Number of Investors")
+```
+
+```{r cor99, echo=FALSE, cache=TRUE}
+with(prosper, cor(Investors, LenderYield))
+```
+
+From this plot, I didn't see anything interesting ongoing on. And the number of investors has little correlation with the lender's yield.
+
+
+```{r plot21, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = subset(prosper, ProsperRating_a != ""), 
+       aes(x = AmountDelinquent, y = LenderYield, 
+           color = ProsperRating_a)) +
+        scale_color_brewer(type = "seq", palette = "Blues") +
+        geom_jitter(alpha = 0.5) + xlab("Amount") +
+        ggtitle("Lender Yield Vs Delinquent Amount")
+```
+
+```{r cor98, echo=FALSE, cache=TRUE}
+with(subset(prosper, !is.na(AmountDelinquent)), 
+     cor(AmountDelinquent, LenderYield))
+```
+
+From the above plot, we could see that lower rating borrower and borrower with high delinquent amount seem to have higher return. How about debt to income ratio?
+
+```{r plot22, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = subset(prosper, ProsperRating_a != ""), 
+       aes(x = DebtToIncomeRatio, y = LenderYield, 
+           color = ProsperRating_a)) +
+        scale_color_brewer(type = "seq", palette = "Greens") +
+        geom_jitter() + xlab("Ratio") +
+        ggtitle("Lender Yield Vs Debt to Income Ratio")
+```
+
+```{r cor97, echo=FALSE, cache=TRUE}
+with(subset(prosper, !is.na(DebtToIncomeRatio)), 
+     cor(DebtToIncomeRatio, LenderYield))
+```
+
+The above plot shows that there is a relationship between lender yield and debt to income ratio. If I take log of the lender yield, the relationship seems to be more clear.
+
+```{r plot23, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = subset(prosper, ProsperRating_a != ""), 
+       aes(x = DebtToIncomeRatio, y = LenderYield, color = ProsperRating_a)) +
+        geom_jitter() +
+        scale_color_brewer(type = "seq", palette = "Greens") +
+        scale_y_log10() +
+        xlab("Ratio") +
+        ylab("Log Lender Yield") +
+        ggtitle("Log Lender Yield Vs Debt to Income Ratio")
+```
+
+
+Are there some interactions between the length of loans and the Prosper rating for yield?
+
+```{r plot24, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = subset(prosper, ProsperRating_a != ""), 
+       aes(x = ProsperRating_a, y = LenderYield)) +
+        geom_boxplot(aes(fill = ProsperRating_a)) +
+        scale_fill_brewer(type = "seq", palette = "Greens") +
+        facet_wrap(~Term) +
+        xlab("Prosper Rating") +
+        ggtitle("Yield for Different Prosper Rating")
+```
+
+From this plot, we could tell that for each rating, 60-month loan tends to have the highest average return, while 12-month load tends to have lowest average return.
+
+Next, I build five linear models.
+
+```{r model, cache=TRUE, echo=TRUE}
+m1 = lm(LenderYield ~ DebtToIncomeRatio, data = prosper)
+m2 = update(m1, ~. + BorrowerState)
+m3 = update(m2, ~. + Term)
+m4 = update(m3, ~. + ProsperRating_a)
+m5 = update(m4, ~. + AmountDelinquent)
+mtable(m1, m2, m3, m4, m5)
+```
+
+From the models above we could see that DebtToIncomeRatio and BorrowerState are of little use for predicting the return of loans. However, loan Term, ProsperRating_a and AmountDelinquent are very useful for predicting the return. According to the p-values, all the variables in the full model are significant. Moreover, the full model has a Adjusted R-squred of 0.7333 indicating that this is a valid model.
+
+
+
+### Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
+
+I found that the length of loans and Prosper rating were good indicators for the return of the loans. It also appeared to me that these two variables strenghen each other, since in the plot loans with different term and different rating have different mean return.
+
+
+### Were there any interesting or surprising interactions between features?
+
+Yes. The interaction between feature Term and ProsperRating is very interesting. With these two variables, it is easier to predict the return.
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the strengths and limitations of your model.
+
+Yes, I built models with feature DebtToIncomeRatio, AmountDelinquent,ProsperRating_a, Term, and BorrowerState. The strength of my model is that since the adjusted R-squared of my full model is 0.733, the model can be used to predict the outcome. However, the limitation is that it is not good enough. It would be better if the adjusted R-squared is above 0.85.
+
+
+
+
+
+
+
+# Final Plots and Summary
+==================
+
+## Plot One
+
+```{r plot25, cache=TRUE, echo=FALSE}
+ggplot(data = prosper, aes(x = LenderYield)) +
+        geom_histogram(color = "black", fill = "cyan", binwidth = 0.01) + 
+        xlab("Yield") +
+        ggtitle("Lenders' Yield")
+```
+
+## Description One
+
+```{r plot5_22, cache=TRUE,echo=FALSE}
+mean(prosper$LenderYield)
+sd(prosper$LenderYield)
+length(unique(prosper[prosper$LenderYield<0,]$ListingNumber))
+```
+
+From the above histogram, we could see that the lender's yield approximated follows a normal distribution, with mean 0.182701 and standard deviation 0.0745. Therefore, as a investor, one could expect about 18% return for investment, which is a very attractive. Among all the 113,937 records, only 12 of them have negative LenderYield. There is a spike around 0.3. Around 7000 loans have return about 0.3. Thus, if the lender is lucky enough, he has good chance of getting 30% return.
+
+## Plot Two
+
+```{r plot26, results = 'asis', echo=FALSE, cache=TRUE}
+print(lenderyield_state_map)
+```
+
+
+````{r plot262, echo=FALSE, cache=TRUE}
+ggplot(data = prosper, aes(x = ProsperRating_a, y = LenderYield)) +
+        geom_boxplot(aes(fill = ProsperRating_a)) +
+        scale_fill_brewer(type = "seq", palette = "Blues") +
+        xlab("Prosper Rating") +
+        ggtitle("Yield for Different Prosper Rating")
+```
+
+## Description Two
+
+From the above two plots, I made two observations. The first one is that different states tend to have different level of returns. States in the south, e.g., Mississippi, Alabama, Arkansas, Tennessee have very high yields on average. States in the middle, for instance, Colorado, Oklahoma, Kansas, Nebraska have slightly lower yield. The maximum mean return among all the states is in Alabama, which is 0.201576. The minimum mean return among all the states is in Iowa, which is 0.153122. Therefore, investing borrowers from Mississippi, Alabama, Arkansas, Tennessee sounds like a good idea.
+
+```{r yield_rating, cache=TRUE, echo=FALSE}
+tapply(prosper$LenderYield, prosper$ProsperRating_a, mean)
+```
+
+Secondly, borrower rating from Prosper can be used to predict the result of the loan. Prosper rating AA has lowest mean return of 0.0691108, and HR has the highest mean return of 0.3073178. Prosper rating A, B, C, D, E have mean return 0.1029334, 0.1444487, 0.1844266, 0.2364142, 0.2833354, respectively. Therefore, to have higher return, we should invest in the low rating borrowers. One may argue that, investing in low rating borrowers tend to have very high risks. However, as I have noted before, since there are only 12 out of 113937 loans (0.01%) result in negative returns, there is almost no chance for losing money. So we really should invest in these low ranking borrowers.
+
+
+
+## Plot Three
+
+```{r plot27, echo=FALSE, cache=TRUE, warning=FALSE}
+ggplot(data = subset(prosper, ProsperRating_a != ""), 
+       aes(x = DebtToIncomeRatio, y = LenderYield, color = ProsperRating_a)) +
+        geom_jitter() +
+        facet_wrap(~ProsperRating_a, ncol=2) +
+        scale_color_brewer(type = "seq", palette = "Blues") +
+        scale_y_log10() +
+        xlab("Ratio") +
+        ylab("Log Lender Yield") +
+        ggtitle("Lender Yield Vs Debt to Income Ratio")
+
+ggplot(data = subset(prosper, ProsperRating_a != ""), 
+       aes(x = ProsperRating_a, y = LenderYield)) +
+        geom_boxplot(aes(fill = ProsperRating_a)) +
+        scale_fill_brewer(type = "seq", palette = "Blues") +
+        facet_wrap(~Term) +
+        xlab("Prosper Rating") +
+        ggtitle("Yield for Different Prosper Rating")
+```
+
+## Description Three
+
+From the above two figures, I have the following observations.
+The debt to income ratio can be served as an indicator for the yield of the loan. Although for low debt to income ratio borrowers it is hard to predict the yield, for high debt to income ratio borrowers, lending money to them usually produce high returns. Thus, it is a good idea to lend money to these high DebtToIncomeRatio borrowers.
+
+```{r yield_term, cache=TRUE, echo=FALSE}
+tapply(prosper$LenderYield, prosper$Term, mean)
+```
+
+Also, different lengths of loan tend to different yields. For 12-month loan, the mean return is 0.1400807, for 36-month loan the mean return 0.1834037, and for 60-month loan the mean return is 0.1829902. So investing in 36-month is an excellent choice, since it has the highest expected return and the time of the loan is not very long.
+
+Combining these two plots, we can see that on average, lending money to borrower with Prosper rating HR for 36 month will have highest return.
+
+
+
+
+
+
+# Reflections
+
+The Prosper loan data set has 113,937 transaction record with 81 variables. I explored 15 out of these 81 variables. I started by looking at the documentation and tried to find interesting variables. Then I used various plots to check how these variable distributed. 
+I struggled with understanding this dataset and asking interesting questions out of this dataset. To further understand this dataset, I tried to visualize the interaction between two variables. For instance, I investigated how BorrowerRate is correlated with LenderYield, etc. Then one question came into my mind: if I were a lender, what kind of borrower should I lend my money to? 
+From the lender's perspective, he doesn't care about the borrower's income range, the borrower's credit score, the borrower's purpose of borrowing money or the borrower's delinquent amount.
+The only thing he cares about is to make more money. With this on mind, I made more bivariate plots and tried to find which variables are correlated with the LenderYield variable. 
+I found that the rating from Prosper was an good indicator in a seemingly strange way. That is the lower the rating is, the higher the expected yield is. This is surprising at first. Then I found that this was true, since we need higher return to compensate high risk. I also found the BorrowerState, Term, AmountDelinquent, DebtToIncomeRatio helpful to predicting the loan result through multivariate analysis. To summarize my finding in one single sentence, you should lend your money to some borrowers from Alabama, with Propser rating HR, high delinquent amount, high debt to income ratio for 36 or 60 months.
+
+For future work, I would like to build more complex models such as random forest regressor so that the prediction could be more accurate. On the other hand, since there are so many unexplored variables, I also want to explore them one by one. Hopefully features containing more information can be extracted.
+
+
+#Reference
+1. Prosper official site: https://www.prosper.com/
+2. rMaps: http://www.r-bloggers.com/rmaps-mexico-map/
+3. R Colors: http://vis.supstat.com/2013/04/plotting-symbols-and-color-palettes/
+4. Tips for rMaps and rCharts: http://daisukeichikawa.blogspot.com/2014/03/tips-for-rmaps-and-rcharts.html
+5. FICO Score of Zero: https://www.nerdwallet.com/blog/credit-score/zero-fico-score/
+6. Credit score statistics: http://www.creditcards.com/credit-card-news/credit-score-statistics.php

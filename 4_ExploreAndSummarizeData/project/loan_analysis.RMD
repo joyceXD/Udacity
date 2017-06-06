@@ -1,0 +1,470 @@
+Loan analysis by Xin Pang
+========================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using in your analysis in this code
+# chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk. This
+# prevents the code from displaying in the knitted HTML output. You should set
+# echo=FALSE for all code chunks in your file, unless it makes sense for your
+# report to show the code that generated a particular plot.
+
+# The other parameters for "message" and "warning" should also be set to FALSE
+# for other code chunks once you have verified that each plot comes out as you
+# want it to. This will clean up the flow of your report.
+
+packages <- c("dplyr", "ggplot2", "gridExtra", "plyr")
+new.packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)){
+  install.packages(new.packages)
+}
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(plyr)
+```
+
+```{r echo=FALSE, Load_the_Data}
+# Load the Data
+df.loan <- read.csv("./prosperLoanData.csv", header = TRUE)
+```
+
+**Background**
+Prosper.com is a peer-to-peer lending website privoding individuals with 
+services to borrow money or invest in personal loans. According to [Wikipedia](https://en.wikipedia.org/wiki/Prosper_Marketplace) this 
+company used two different ways to calculate loan interest rates. From 2006 to 
+2009 the loan interest rate was determined by borrowers and lenders in a bidding
+system. Afterwards the rate is predefined by Prosper based on a formula 
+evaluating each prospective borrower's credit risk. The dataset to be analyzed
+contains users' loan details from November 2005 to March 2014, including 113937 
+loan records with 81 variables.
+
+# Overview
+
+We want to know the type of each column, wether they are numeric or factor, 
+such that we can select a few of them for analysis. Due to the large number of 
+variables in the dataframe, here I only show the type of first 10 attributes.
+From the result we can see there are both factor variables and numerical variables.
+
+```{r echo=FALSE, Univariate_Plots_0}
+head(lapply(df.loan, class), n = 10)
+```
+
+The main features of interest are the following:
+
+* Term: The length of the loan expressed in months. (integer->factor)
+* Loan status: The current status of the loan. (factor)
+* Borrower rate: The borrower's interest rate for this loan. (numeric)
+* Listing category: The category of the listing that the borrower selected when 
+posting their listing. (integer->factor)
+* Credit score range lower: The lower value representing the range of the borrower's credit score as provided by a consumer credit rating agency. (numeric)
+* Credit score range upper: The upper value representing the range of the borrower's credit score as provided by a consumer credit rating agency. (numeric)
+* Income range: The income range of the borrower at the time the listing was 
+created. (factor)
+* Loan original amount: The origination amount of the loan. (integer)
+* Loan origination date: The origination date of the loan. (factor->date)
+* Percent funded: Percent the listing was funded. (numeric)
+* Recommendations: Number of recommendations the borrower had at the time the 
+listing was created. (integer)
+* Investors: The number of investors that funded the loan. (integer)
+
+There are a few variables requiring a conversion for proper types.
+
+* Term: contains 3 values and can be changed to a factor.
+* Listing category: they are actually coded into numbers, each number 
+representing one category, thus it should be factor instead of integer.
+* Loan origination date: should be in date format.
+
+Below processes the column type conversion and change the factor level of Listing
+Category. Afterwards we look at the summary of all variables of interest. 
+Almost all the values are in normal range, only in investors we see loans funded
+by 1189 members to the maximum, which is an unusual thing.
+
+```{r echo=FALSE, Univariate_Plots_1}
+
+# change column type from integers to factors
+df.loan$Term <- factor(df.loan$Term)
+df.loan$ListingCategory <- factor(df.loan$ListingCategory..numeric.)
+df.loan$ProsperScore = factor(df.loan$ProsperScore)
+df.loan$LoanOriginationDate <- as.POSIXct(df.loan$LoanOriginationDate,
+                                          format = "%Y-%m-%d %H:%M:%OS")
+
+# re-order factor levels for IncomeRange
+df.loan$IncomeRange <- factor(df.loan$IncomeRange, 
+                           levels = c("$0", "$1-24,999", "$25,000-49,999",
+                                      "$50,000-74,999", "$75,000-99,999",
+                                      "$100,000+", "Not employed", "Not displayed"))
+
+# change factor level values for ListingCategory
+df.loan$ListingCategory <- revalue(df.loan$ListingCategory, 
+                                   c("0"="Not Available", "1"="Debt Consolidation",
+                                     "2"="Home Improvement", "3"="Business",
+                                     "4"="Personal Loan", "5"="Student Use",
+                                     "6"="Auto", "7"="Other",
+                                     "8"="Baby&Adoption","9"="Boat",
+                                     "10"="Cosmetic Procedure", "11"="Engagement Ring", 
+                                     "12"="Green Loans", "13"="Household Expenses", 
+                                     "14"="Large Purchases", "15"="Medical/Dental", 
+                                     "16"="Motorcycle", "17"="RV", 
+                                     "18"="Taxes", "19"="Vacation", 
+                                     "20"="Wedding Loans"))
+
+
+# select subset of the complete dataset for generating plots
+selected.features <- c("Term", "LoanStatus", "BorrowerRate", "ListingCategory", 
+                       "CreditScoreRangeLower", "CreditScoreRangeUpper",
+                       "IncomeRange", "LoanOriginalAmount", "LoanOriginationDate",
+                       "PercentFunded", "ProsperScore", "Recommendations", 
+                       "Investors")
+df.loan.subset <- df.loan[, selected.features]
+summary(df.loan.subset)
+```
+# Univariate section
+#### Is the number of loans affected by choices of different interest rate models?
+As mentioned earlier, Prosper used two models for calculating loan interest rate.
+The plot below shows a drop in year 2009, and this is exactly when the new 
+interest rate model was applied. Afterwards the number of loans started increasing
+steadily every year.
+```{r echo=FALSE, Univariate_Plots_2}
+df.loan.subset$LoanOriginationYear <- format(df.loan.subset$LoanOriginationDate,
+                                             "%Y")
+ggplot(data = df.loan.subset, mapping = aes(x = LoanOriginationYear)) +
+  geom_bar(color = "white", fill = "blue", alpha = 0.3) +
+  scale_y_continuous() +
+  ggtitle("Number of loans per year from 2005 to 2014")
+
+```
+
+#### What is the most chosen term of loans?
+The plot below shows most people have chosen loans of longer terms. 36 months of
+loans are chosen by most of the people.
+```{r echo=FALSE, Univariate_Plots_3}
+ggplot(data = df.loan.subset, mapping = aes(x = Term)) +
+  geom_bar(color = "white", fill = "blue", alpha = 0.3) +
+  scale_y_continuous(breaks = seq(0, 100000, 10000)) +
+  ggtitle("Number of loans per term")
+
+```
+
+#### What are the income range of borrowers?
+One interesting question is which income level contributes to the most number of
+loans. This helps us understand the target user base and provide more customized
+services in the future. I thought people with low income would have most number 
+of loans, because people would need more financial help to satisfy some basic 
+living requirements such as buying a house or education for children. Contrarily, 
+this plot shows people with income 25000 to 75000 contributed to the most number 
+of loans, instead of people with income 1 to 24999. Also, it is surprising to see
+people with income 0 could actually successfully have a loan. One guess might be
+the income only contains income from a job, instead of other sources.
+```{r echo=FALSE, Univariate_Plots_4}
+# change the order level of the factor
+ggplot(data = df.loan.subset, mapping = aes(x = IncomeRange)) +
+  geom_bar(color = "white", fill = "blue", alpha = 0.3) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Number of loans per income range")
+
+```
+
+#### For what purposes do people borrow loans?
+The plot below shows different purposes of loans. The category of debt-consolidation
+has most number of loans. Given in this case people borrow loan here to pay off
+other loans, it indicates that the loan interest rate would be lower than from
+other sources. We will look into detail when analyzing the purpose vs. loan
+interest rate later.
+```{r echo=FALSE, Univariate_Plots_5}
+ggplot(data = df.loan.subset, mapping = aes(x = ListingCategory)) +
+  geom_bar(color = "white", fill = "blue", alpha = 0.3) +
+  scale_y_continuous(breaks = seq(0, 100000, 10000)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Number of loans per category")
+
+```
+
+#### What is the range of loan interest rate?
+Next we generate a histogram for borrower interest rate with bin width 0.01. 
+Overall, the most frequent interest rate is around 0.15, with frequency decreasing
+along each side. It is worth noticing in the range of 0.32-0.33, there is another 
+peak. This might be some default value determined by the system. Later we can 
+answer this question by looking at average interest rates over time.
+```{r echo=FALSE, Univariate_Plots_6}
+qplot(data = df.loan.subset, 
+      x = BorrowerRate, 
+      geom ="histogram", 
+      binwidth = 0.01,
+      main = "Histogram for borrower interest rate",
+      fill = I("blue"),
+      col = I("white"),
+      alpha = I(.3))
+
+```
+
+#### How much money will people borrow in a loan?
+This histogram shows the loan amount. From the histogram we can see a few peaks.
+Many loans are centered around bins in 4000, 5000, 10000, 15000, 20000 and 25000.
+
+```{r echo=FALSE, Univariate_Plots_7}
+qplot(data = df.loan.subset, 
+      x = LoanOriginalAmount, 
+      geom ="histogram", 
+      binwidth = 500,
+      main = "Histogram for loan amount bin=500",
+      fill = I("blue"),
+      col = I("white"),
+      alpha = I(.3)) +
+  scale_x_continuous(breaks=seq(0, 40000, by=5000)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+If we change the bin size to 5000, then the discrete peaks would disappear. 
+Now the plot shows a more smooth result with most of the loans falling into
+5000-10000 category.
+
+```{r echo=FALSE, Univariate_Plots_8}
+qplot(data = df.loan.subset, 
+      x = LoanOriginalAmount, 
+      geom ="histogram", 
+      binwidth = 5000,
+      main = "Histogram for loan amount bin=5000",
+      fill = I("blue"),
+      col = I("white"),
+      alpha = I(.3)) +
+  scale_x_continuous(breaks=seq(0, 40000, by=5000)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+#### How are the prosper scores distributed across borrowers?
+The plot below shows that there are many missing values. Apart from that borrowers'
+score are almost normally distributed. Most of the borrowers have score ranging 
+from 4 to 8. 
+
+```{r echo=FALSE, Univariate_Plots_9}
+ggplot(data = df.loan.subset, mapping = aes(x = ProsperScore)) + 
+  geom_bar(color = "white", fill = "blue", alpha = 0.3) +
+  ggtitle("Borrowers' prosper scores")
+```
+
+#### How are the credit ratings distributed across borrowers?
+The plot below shows that the lower and upper bound of credit ratings are approximately
+within the same range.
+
+```{r echo=FALSE, Univariate_Plots_10}
+p1 <- ggplot(data = df.loan.subset, mapping = aes(x = CreditScoreRangeLower)) +
+  geom_bar(color = "white", fill = "blue", alpha = 0.3) +
+  ggtitle("Credit scores lower bound")
+p2 <- ggplot(data = df.loan.subset, mapping = aes(x = CreditScoreRangeUpper)) +
+  geom_bar(color = "white", fill = "blue", alpha = 0.3) +
+  ggtitle("Credit scores upper bound")
+grid.arrange(p1, p2, nrow = 2)
+```
+
+#### How many people will invest per loan?
+This histogram shows the number of investors for the loans. Most of the loans are 
+invested by 1-10 investors. 
+
+```{r echo=FALSE, Univariate_Plots_11}
+qplot(data = df.loan.subset, 
+      x = Investors, 
+      geom ="histogram", 
+      binwidth = 10,
+      main = "Histogram for number of investors",
+      fill = I("blue"),
+      col = I("white"),
+      alpha = I(.3))
+
+```
+
+# Bivariate Plots Section
+
+#### For all the selected numerical variables, how are they correlated?
+From the correlation table we can see the loan original amount and investors have
+a slight positive correlation. This is not surprising, since larger amount of 
+loans would be easier to be invested with multiple people rather than only one
+person. Also the loan original amount and borrower rate are slightly negative 
+correlated, i.e. the more money people borrow, the less interest rate, this is
+also not an unusual thing.
+
+```{r echo=FALSE, Bivariate_Plots_1}
+nums <- sapply(df.loan.subset, is.numeric)
+cor(df.loan.subset[, nums])
+
+```
+
+#### How are the loan amount distributed for different income categories?
+The plot below shows people with higher income borrows a larger amount of loan.
+Again the unexpected thing happened with 0 income people. Not only they were able
+to borrow a loan, some of them can actually borrow a large amount of loan, as we
+can see from the outliers quite a few loan amount are between 22000 to 25000.
+
+```{r echo=FALSE, Bivariate_Plots_2}
+ggplot(data = df.loan.subset, mapping = aes(x = IncomeRange,
+                                            y = LoanOriginalAmount,
+                                            group = IncomeRange)) + 
+  geom_boxplot(aes(fill=IncomeRange)) +
+  scale_fill_brewer(palette="Blues") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Loan amount for different income levels")
+
+```
+
+#### How are the loan interest distributed for different income categories?
+Overall we see a decreasing trend with people's income getting higher. One 
+particular category to notice is the unemployed category rate. For unemployed
+people, the rates are slightly higher than other income categories (~0.25). Given
+previously we also noticed higher income people tend to borrow more money, and 
+the larger amount of loan results in lower interest rate, it makes sense to see
+this trend here.
+
+```{r echo=FALSE, Bivariate_Plots_3}
+ggplot(data = df.loan.subset, mapping = aes(x = IncomeRange,
+                                            y = BorrowerRate,
+                                            group = IncomeRange)) + 
+  geom_boxplot(aes(fill=IncomeRange)) +
+  scale_fill_brewer(palette="Blues") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Loan interest rate for different income levels")
+
+```
+
+#### How are the loan interest distributed for different loan purposes?
+Overall we don't see any category to have a particularly high average loan rate. 
+The average rates range from 0.15 to 0.25.
+
+```{r echo=FALSE, Bivariate_Plots_4}
+ggplot(data = df.loan.subset, mapping = aes(x = ListingCategory,
+                                            y = BorrowerRate,
+                                            group = ListingCategory)) + 
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Loan interest rate for different listing categories")
+
+```
+
+#### How are the loan interest distributed for different prosper ratings?
+Overall we see the trend of higher rating with a lower average of loan interest
+rate. This helps us understand what is important in determining the interest rate.
+
+```{r echo=FALSE, Bivariate_Plots_5}
+ggplot(data = df.loan.subset, mapping = aes(x = ProsperScore,
+                                            y = BorrowerRate,
+                                            group = ProsperScore)) + 
+  geom_boxplot() +
+  ggtitle("Loan interest rate for different prosper ratings")
+
+```
+
+#### How are the loan interest rate distributed for number of investors?
+Here we could see a slightly decreasing trend for the number of investors when 
+the borrower rate goes high. 
+
+```{r echo=FALSE, Bivariate_Plots_6}
+ggplot(data = df.loan.subset, mapping = aes(x = BorrowerRate,
+                                            y = Investors)) + 
+  geom_point() +
+  ggtitle("Loan interest rate vs number of investors")
+
+```
+
+
+# Multivariate Plots Section
+
+#### How does the borrower interest rate for different terms change over time?
+From the plot below we can see loan terms of 12 months and 60 months did not 
+exist until somewhere end of 2010. The interest rate for 12 months loans are 
+varying quite a lot, whereas the interest rate for 36 and 60 months loans are 
+changing in a more steady manner.
+
+```{r echo=FALSE, Multivariate_Plots_1}
+ggplot(data = df.loan.subset, mapping = aes(x = LoanOriginationDate,
+                                            y = BorrowerRate,
+                                            color = Term,
+                                            alpha = 0.1)) + 
+  stat_summary(fun.y="mean", geom = "point") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Average loan interest rate for different loan terms")
+```
+
+#### How does the borrower interest rate for people with different prosper 
+scores change overtime?
+From the plot we can see there is no user with score 11 before 2013. As for the 
+rest, the interest rate is going down as time goes. Again, people with higher 
+prosper scores have a lower rate for loans than people with low scores.
+
+```{r echo=FALSE, Multivariate_Plots_2}
+ggplot(data = df.loan.subset, mapping = aes(x = LoanOriginationDate,
+                                            y = BorrowerRate,
+                                            color = ProsperScore)) + 
+  facet_wrap( ~ ProsperScore) +
+  stat_summary(fun.y="mean", geom = "point", alpha = 0.3) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Average loan interest rate for different prosper scores overtime")
+```
+
+
+------
+
+# Final Plots and Summary
+
+In this project I mainly explored the relationships between borrowers' interest
+rate and borrowers' income, prosper rating and term respectively. 
+
+Overall we see, with people's income increasing, the average interest rate is 
+decreasing. In particular we noticed the rate for unemployment category. The rates 
+are slightly higher than other income categories. 
+
+```{r echo=FALSE, Plot_One}
+ggplot(data = df.loan.subset, mapping = aes(x = IncomeRange,
+                                            y = BorrowerRate,
+                                            group = IncomeRange)) + 
+  geom_boxplot(aes(fill=IncomeRange)) +
+  scale_fill_brewer(palette="Blues") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Loan interest rate for different income levels")
+
+```
+
+From the plot below we can see after applying the new rate calculation model,
+Prosper also provided additional service types, i.e. 12 month and 60 month loan.
+Also, the interest rate for 12 months loans are varying in a more unpredictable
+manner compared with the rates for 36 and 60 months loans.
+
+
+```{r echo=FALSE, Plot_Two}
+ggplot(data = df.loan.subset, mapping = aes(x = LoanOriginationDate,
+                                            y = BorrowerRate,
+                                            color = Term)) + 
+  stat_summary(fun.y="mean", geom = "point", aes(alpha = 0.3)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Average loan interest rate for different loan terms")
+```
+
+Lastly, we see the importance of prosper scores in correlation with the interest
+rate. It is obvious that as the prosper scores grow higher, the average interest
+rate is lower. Also, as time goes the interest rate shows a decreasing trend.
+
+```{r echo=FALSE, Plot_Three}
+ggplot(data = df.loan.subset, mapping = aes(x = LoanOriginationDate,
+                                            y = BorrowerRate,
+                                            color = ProsperScore)) + 
+  facet_wrap( ~ ProsperScore) +
+  stat_summary(fun.y="mean", geom = "point", alpha = 0.3) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Average loan interest rate for different prosper scores overtime")
+```
+
+------
+
+# Reflection
+
+The most struggling part is to select the relevant variables in the dataset.
+There are too many variables and without a focus or a list of questions in mind,
+it is really difficult to make a decision. In addition, understanding the dataset
+is also difficult without a proper context. After getting a good understanding 
+of how Prosper is running its business and how the peer-to-peer lending works, 
+the analysis got easier to proceed. The biggest lesson learnt here is, there could
+not be a good analysis without a good understanding of the business / industry.
