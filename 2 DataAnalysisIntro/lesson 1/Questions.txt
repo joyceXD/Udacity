@@ -1,6 +1,0 @@
-Questions that are interesting to look at
-1. How many days does it take before a student cancel the degree program?
-2. How many submissions is expected for a project? - difficulty level
-3. How much time on average does the students spend every visit?
-4. What is the relationship between the time spent and the number of submissions of a project?
-5. For people who cancel the degree program, did they submit any projects?
