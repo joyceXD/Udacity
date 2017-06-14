@@ -31,6 +31,7 @@ person_attrs = enron_data['LAY KENNETH L'].keys()
 
 for person, feature_dict in enron_data.items():
     total_person += 1
+
     if feature_dict['poi'] == 1:
         num_poi += 1
     if feature_dict['salary'] != 'NaN':
@@ -62,6 +63,7 @@ feature_list = ['poi', 'salary', 'to_messages', 'deferral_payments', 'total_paym
                 'bonus', 'restricted_stock', 'shared_receipt_with_poi', 'restricted_stock_deferred',
                 'total_stock_value', 'expenses', 'loan_advances', 'from_messages', 'other', 'from_this_person_to_poi',
                 'director_fees', 'deferred_income', 'long_term_incentive', 'from_poi_to_this_person']
+
 
 data_array = featureFormat(enron_data, feature_list)
 label, features = targetFeatureSplit(data_array)
