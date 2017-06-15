@@ -1,9 +1,11 @@
 #!/usr/bin/python
 
+import matplotlib as plt
 import numpy as np
 import pandas as pd
-import sys
 import pickle
+import sys
+
 sys.path.append("../tools/")
 
 from feature_format import featureFormat, targetFeatureSplit
@@ -12,7 +14,12 @@ from tester import dump_classifier_and_data
 # Task 1: Select what features you'll use.
 # features_list is a list of strings, each of which is a feature name.
 # The first feature must be "poi".
-features_list = ['poi','salary', 'to_messages']  # You will need to use more features
+features_list = ['poi', 'salary', 'to_messages', 'deferral_payments', 'total_payments',
+                 'exercised_stock_options', 'bonus', 'restricted_stock', 'shared_receipt_with_poi',
+                 'restricted_stock_deferred', 'total_stock_value', 'expenses', 'loan_advances',
+                 'from_messages', 'other', 'from_this_person_to_poi', 'director_fees', 'deferred_income',
+                 'long_term_incentive', 'from_poi_to_this_person']  # 'email_address' is excluded
+
 
 # Load the dictionary containing the dataset
 with open("final_project_dataset.pkl", "r") as data_file:
