@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pickle
@@ -36,10 +36,18 @@ labels, features = targetFeatureSplit(data)
 
 features = pd.DataFrame(features)
 
-print type(features)
-print features.describe()
+# print features.describe()
 
-# Task 4: Try a varity of classifiers
+for i in range(1, len(features.columns)):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.boxplot(features.iloc[:, i-1])
+    ax.set_xlabel(features_list[i])
+    plt.savefig('./plot/{}.png'.format(features_list[i]))
+
+
+
+# Task 4: Try a variaty of classifiers
 # Please name your classifier clf for easy export below.
 # Note that if you want to do PCA or other multi-stage operations,
 # you'll need to use Pipelines. For more info:
