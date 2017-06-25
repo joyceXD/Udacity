@@ -11,6 +11,13 @@ sys.path.append("../tools/")
 from feature_format import featureFormat, targetFeatureSplit
 from tester import dump_classifier_and_data
 
+# Functions
+def calc_ratio(value, total):
+    if total == 0:
+        return 0
+    else:
+        return float(value) / float(total)
+
 # Task 1: Select what features you'll use.
 # features_list is a list of strings, each of which is a feature name.
 # The first feature must be "poi".
@@ -18,7 +25,7 @@ features_list = ['poi', 'salary', 'to_messages', 'deferral_payments', 'total_pay
                  'exercised_stock_options', 'bonus', 'restricted_stock', 'shared_receipt_with_poi',
                  'restricted_stock_deferred', 'total_stock_value', 'expenses', 'loan_advances',
                  'from_messages', 'other', 'from_this_person_to_poi', 'director_fees', 'deferred_income',
-                 'long_term_incentive', 'from_poi_to_this_person']  # 'email_address' is excluded
+                 'long_term_incentive', 'from_poi_to_this_person', 'email_address']  # 'email_address' is excluded
 
 # Load the dictionary containing the dataset
 with open("final_project_dataset.pkl", "r") as data_file:
@@ -26,27 +33,50 @@ with open("final_project_dataset.pkl", "r") as data_file:
 
 # Store to my_dataset for easy export below.
 my_dataset = data_dict
+print len(data_dict.keys())
 
 # Extract features and labels from dataset for local testing
-data = featureFormat(my_dataset, features_list, sort_keys=True)
+data = featureFormat(dictionary = my_dataset,
+                     features = features_list,
+                     remove_NaN = False,
+                     remove_all_zeroes = False,
+                     remove_any_zeroes = False,
+                     sort_keys=False)
+print data.shape
 labels, features = targetFeatureSplit(data)
+
+print len(features)
 
 # Convert to pandas dataframe
 features = pd.DataFrame(features)
 
 # Explore and visualize statistics of each column to find outliers
-print features.describe()
+# print features.describe()
 
-for i in range(1, len(features.columns)):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.boxplot(features.iloc[:, i - 1])
-    ax.set_xlabel(features_list[i])
-    plt.savefig('./plot/{}.png'.format(features_list[i]))
+# for i in range(1, len(features.columns)):
+#     # fig = plt.figure()
+#     # ax = fig.add_subplot(111)
+#     # ax.boxplot(features.iloc[:, i - 1])
+#     plt.hist(features.iloc[:, i - 1], 100, facecolor='green', alpha=0.75)
+#     plt.xlabel(features_list[i])
+#     plt.savefig('./plot/hist_{}.png'.format(features_list[i]))
 
 # Task 2: Remove outliers
-# Task 3: Create new feature(s)
 
+
+# Task 3: Create new feature(s)
+features['from_this_person_to_poi_fraction'] = features.apply(lambda row: calc_ratio(row['from_this_person_to_poi'],
+                                                                                     row['from_messages']),
+                                                              axis=1)
+features['from_poi_to_this_person_fraction'] = features.apply(lambda row: calc_ratio(row['from_poi_to_this_person'],
+                                                                                     row['to_messages']),
+                                                              axis=1)
+features['bonus_over_payment_ratio'] = features.apply(lambda row: calc_ratio(row['bonus'],
+                                                                              row['total_payments']),
+                                                       axis=1)
+features['exercised_stock_ratio'] = features.apply(lambda row: calc_ratio(row['exercised_stock_options'],
+                                                                          row['total_stock_value']),
+                                                   axis=1)
 # Task 4: Try a variaty of classifiers
 # Please name your classifier clf for easy export below.
 # Note that if you want to do PCA or other multi-stage operations,

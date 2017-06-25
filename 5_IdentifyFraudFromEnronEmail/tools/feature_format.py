@@ -61,7 +61,9 @@ def featureFormat( dictionary, features, remove_NaN=True, remove_all_zeroes=True
     else:
         keys = dictionary.keys()
 
+    i = 0
     for key in keys:
+        i += 1
         tmp_list = []
         for feature in features:
             try:
@@ -72,7 +74,10 @@ def featureFormat( dictionary, features, remove_NaN=True, remove_all_zeroes=True
             value = dictionary[key][feature]
             if value=="NaN" and remove_NaN:
                 value = 0
-            tmp_list.append( float(value) )
+            try:
+                tmp_list.append( float(value) )
+            except ValueError as e:
+                tmp_list.append( value )
 
         # Logic for deciding whether or not to add the data point.
         append = True
@@ -98,6 +103,7 @@ def featureFormat( dictionary, features, remove_NaN=True, remove_all_zeroes=True
         ### Append the data point if flagged for addition.
         if append:
             return_list.append( np.array(tmp_list) )
+            print i, ":", tmp_list
 
     return np.array(return_list)
 
