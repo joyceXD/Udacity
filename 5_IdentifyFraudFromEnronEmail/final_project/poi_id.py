@@ -11,12 +11,14 @@ sys.path.append("../tools/")
 from feature_format import featureFormat, targetFeatureSplit
 from tester import dump_classifier_and_data
 
+
 # Functions
 def calc_ratio(value, total):
     if total == 0:
         return 0
     else:
         return float(value) / float(total)
+
 
 # Task 1: Select what features you'll use.
 # features_list is a list of strings, each of which is a feature name.
@@ -36,11 +38,11 @@ my_dataset = data_dict
 print len(data_dict.keys())
 
 # Extract features and labels from dataset for local testing
-data = featureFormat(dictionary = my_dataset,
-                     features = features_list,
-                     remove_NaN = False,
-                     remove_all_zeroes = False,
-                     remove_any_zeroes = False,
+data = featureFormat(dictionary=my_dataset,
+                     features=features_list,
+                     remove_NaN=True,
+                     remove_all_zeroes=True,
+                     remove_any_zeroes=False,
                      sort_keys=False)
 print data.shape
 labels, features = targetFeatureSplit(data)
@@ -72,8 +74,8 @@ features['from_poi_to_this_person_fraction'] = features.apply(lambda row: calc_r
                                                                                      row['to_messages']),
                                                               axis=1)
 features['bonus_over_payment_ratio'] = features.apply(lambda row: calc_ratio(row['bonus'],
-                                                                              row['total_payments']),
-                                                       axis=1)
+                                                                             row['total_payments']),
+                                                      axis=1)
 features['exercised_stock_ratio'] = features.apply(lambda row: calc_ratio(row['exercised_stock_options'],
                                                                           row['total_stock_value']),
                                                    axis=1)
