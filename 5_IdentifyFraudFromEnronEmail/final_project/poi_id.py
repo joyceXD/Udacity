@@ -5,14 +5,18 @@ import numpy as np
 import pandas as pd
 import pickle
 import sys
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import GridSearchCV
-from sklearn.svm import SVC
+
+from sklearn.feature_selection import mutual_info_classif, SelectKBest, VarianceThreshold
+from sklearn.model_selection import cross_val_score, GridSearchCV, StratifiedShuffleSplit, train_test_split
+from sklearn import naive_bayes, svm
+from sklearn import preprocessing
+
 
 sys.path.append("../tools/")
 
 from feature_format import featureFormat, targetFeatureSplit
 from tester import dump_classifier_and_data
+
 
 # Functions to be used in this project
 def calc_ratio(value, total):
@@ -39,7 +43,6 @@ with open("final_project_dataset.pkl", "r") as data_file:
 my_dataset = data_dict
 
 # Extract features and labels from dataset for local testing
-
 data = featureFormat(dictionary=my_dataset,
                      features=features_list,
                      remove_NaN=True,
@@ -49,8 +52,7 @@ data = featureFormat(dictionary=my_dataset,
 
 labels, features = targetFeatureSplit(data)
 
-
-# Convert to pandas data frame
+# Convert to pandas data frame for easier pre-processing and visualization
 features = pd.DataFrame(features)
 
 # for i in range(1, len(features.columns)):
@@ -62,9 +64,7 @@ features = pd.DataFrame(features)
 #     plt.savefig('./plot/hist_{}.png'.format(features_list[i]))
 
 # Task 2: Remove outliers
-
 features.columns = features_list[1:]
-print features.columns.values
 
 # Task 3: Create new feature(s)
 features['from_this_person_to_poi_fraction'] = features.apply(lambda row: calc_ratio(row['from_this_person_to_poi'],
@@ -79,8 +79,6 @@ features['bonus_over_payment_ratio'] = features.apply(lambda row: calc_ratio(row
 features['exercised_stock_ratio'] = features.apply(lambda row: calc_ratio(row['exercised_stock_options'],
                                                                           row['total_stock_value']),
                                                    axis=1)
-
-# Explore and visualize statistics of each column to find outliers
 # print features.describe()
 
 # Task 4: Try a variety of classifiers
@@ -90,23 +88,18 @@ features['exercised_stock_ratio'] = features.apply(lambda row: calc_ratio(row['e
 # http://scikit-learn.org/stable/modules/pipeline.html
 
 # Feature elimination using VarianceThreshold
-from sklearn import preprocessing
-from sklearn.feature_selection import VarianceThreshold
-
 features_scaled = preprocessing.minmax_scale(features)
 fs_var = VarianceThreshold(threshold=0)
 fs_var.fit(features_scaled)
-print "The variances after min-max scaling are: ", fs_var.variances_
-
+# print "The variances after min-max scaling are: ", fs_var.variances_
 
 # Feature selection using K-best
-from sklearn.feature_selection import SelectKBest
-from sklearn.feature_selection import mutual_info_classif
+
 fs_kbest = SelectKBest(score_func=mutual_info_classif, k=15)
 features_kbest = fs_kbest.fit(features, labels)
 kscores = pd.DataFrame(fs_kbest.scores_, columns=['score'], index=features.columns.values)
 kscores = kscores.sort_values('score', ascending=0)
-print "Mutual information for each feature: ", kscores
+# print "Mutual information for each feature: ", kscores
 
 """ Visualize mutual information for each feature """
 # ind = np.arange(len(fs_kbest.scores_))
@@ -118,19 +111,66 @@ print "Mutual information for each feature: ", kscores
 # plt.tight_layout()
 # plt.show()
 
-# Provided to give you a starting point. Try a variety of classifiers.
+# Define list of selected features
+selected_feature_names = ['salary', 'total_payments', 'from_this_person_to_poi_fraction',
+                          'from_poi_to_this_person_fraction', 'bonus', 'restricted_stock', 'shared_receipt_with_poi',
+                          'exercised_stock_ratio', 'restricted_stock_deferred', 'total_stock_value', 'expenses',
+                          'other', 'from_this_person_to_poi', 'deferred_income', 'from_poi_to_this_person']
+selected_features = features[selected_feature_names]
+print 'Pearson correlation between feature pairs: ', selected_features.corr(method='pearson')
 
-#
-# # Task 5: Tune your classifier to achieve better than .3 precision and recall
-# # using our testing script. Check the tester.py script in the final project
-# # folder for details on the evaluation method, especially the test_classifier
-# # function. Because of the small size of the dataset, the script uses
-# # stratified shuffle split cross validation. For more info:
-# # http://scikit-learn.org/stable/modules/generated/sklearn.cross_validation.StratifiedShuffleSplit.html
-#
-# # Example starting point. Try investigating other evaluation techniques!
-# from sklearn.cross_validation import train_test_split
-#
+n_samples = selected_features.shape[0]
+cv = StratifiedShuffleSplit(n_splits=5, test_size=0.3, random_state=99)
+
+# SVM classifier
+features_std_svm = preprocessing.scale(selected_features)
+clf_svm = svm.SVC(class_weight={0: 0.124, 1: 0.876})
+cv_scores = cross_val_score(clf_svm, features_std_svm, labels, cv=cv, scoring='f1')
+print "Support Vector Machine: F1 scores after cross validation are: ", cv_scores
+
+# Naive Bayes classifier
+selected_feature_names_nb = ['total_payments', 'from_this_person_to_poi_fraction', 'from_poi_to_this_person_fraction',
+                             'shared_receipt_with_poi', 'exercised_stock_ratio', 'restricted_stock_deferred',
+                             'from_this_person_to_poi', 'from_poi_to_this_person']
+features_nb = selected_features[selected_feature_names_nb]
+features_std_nb = preprocessing.scale(features_nb)
+clf_nb = naive_bayes.GaussianNB()
+cv_scores = cross_val_score(clf_nb, features_std_nb, labels, cv=cv, scoring='recall')
+print "Naive Bayes: F1 scores after cross validation are: ", cv_scores
+
+
+# Task 5: Tune your classifier to achieve better than .3 precision and recall
+# using our testing script. Check the tester.py script in the final project
+# folder for details on the evaluation method, especially the test_classifier
+# function. Because of the small size of the dataset, the script uses
+# stratified shuffle split cross validation. For more info:
+# http://scikit-learn.org/stable/modules/generated/sklearn.cross_validation.StratifiedShuffleSplit.html
+
+# We use SVM classifier and tune the parameters
+def build_model_svm(features_std):
+    # the input features should be standardized already
+    x_train, x_test, y_train, y_test = train_test_split(features_std, labels, test_size=0.2, random_state=0)
+
+    param_grid = [
+        # {'C': [1, 10, 100, 1000],
+        #  'kernel': ['linear'],
+        #  'class_weight':[{0: 0.1}, {0: 0.3}, {0: 0.5}]},
+
+        {'C': [10, 100],
+         'gamma': [0.001, 0.0001],
+         'kernel': ['rbf'],
+         'class_weight': [{0: 0.1}, {0: 0.5}]},
+    ]
+    scores = ['precision', 'recall']
+
+    grid = GridSearchCV(svm.SVC(), cv=5, n_jobs=1, param_grid=param_grid)
+    grid.fit(x_train, y_train)
+    return grid
+
+grid_results = build_model_svm(features_std_svm)
+
+print grid_results.cv_results_
+
 # features_train, features_test, labels_train, labels_test = \
 #     train_test_split(features, labels, test_size=0.3, random_state=42)
 #
@@ -142,20 +182,9 @@ print "Mutual information for each feature: ", kscores
 # dump_classifier_and_data(clf, my_dataset, features_list)
 
 
-def build_model_svm():
-    features_std = preprocessing.scale(features)
-    x_train, x_test, y_train, y_test = train_test_split(features_std, labels, test_size=0.2, random_state=0)
 
-    param_grid = [
-        {'C': [1, 10, 100, 1000], 'kernel': ['linear']},
-        {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
-    ]
-    scores = ['precision', 'recall']
-
-    grid = GridSearchCV(SVC(), cv=5, n_jobs=2, param_grid=param_grid)
-    grid.fit(x_train, y_train)
-    print grid.best_params_
 
 
 if __name__ == '__main__':
-    build_model_svm()
+    print "main"
+    # build_model_svm()
