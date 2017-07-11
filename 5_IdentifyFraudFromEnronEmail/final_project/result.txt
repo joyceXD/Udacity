@@ -1,0 +1,13 @@
+{'std_train_score': array([ 0.04453618,  0.09958592,  0.        ]), 'rank_test_score': array([3, 2, 1]), 'param_class_weight': masked_array(data = [{0: 0.1} {0: 0.1} {0: 0.1}],
+             mask = [False False False],
+       fill_value = ?)
+, 'split4_test_score': array([ 0.4,  0.6,  1. ]), 'param_gamma': masked_array(data = [0.01 0.001 0.0001],
+             mask = [False False False],
+       fill_value = ?)
+, 'param_C': masked_array(data = [100 100 100],
+             mask = [False False False],
+       fill_value = ?)
+, 'split2_train_score': array([ 0.81818182,  0.72727273,  1.        ]), 'std_score_time': array([  3.99971008e-04,   1.16800773e-07,   3.99994861e-04]), 'split4_train_score': array([ 0.90909091,  0.81818182,  1.        ]), 'split2_test_score': array([ 0.6,  0.8,  1. ]), 'mean_score_time': array([ 0.00119991,  0.00100002,  0.00079999]), 'mean_fit_time': array([ 0.00120006,  0.00120001,  0.00120001]), 'split3_train_score': array([ 0.81818182,  0.72727273,  1.        ]), 'split0_train_score': array([ 0.90909091,  0.81818182,  1.        ]), 'std_test_score': array([ 0.20396078,  0.12649111,  0.        ]), 'split1_train_score': array([ 0.90909091,  1.        ,  1.        ]), 'split0_test_score': array([ 0.6,  0.8,  1. ]), 'mean_test_score': array([ 0.68,  0.8 ,  1.  ]), 'param_kernel': masked_array(data = ['rbf' 'rbf' 'rbf'],
+             mask = [False False False],
+       fill_value = ?)
+, 'params': ({'kernel': 'rbf', 'C': 100, 'gamma': 0.01, 'class_weight': {0: 0.1}}, {'kernel': 'rbf', 'C': 100, 'gamma': 0.001, 'class_weight': {0: 0.1}}, {'kernel': 'rbf', 'C': 100, 'gamma': 0.0001, 'class_weight': {0: 0.1}}), 'std_fit_time': array([ 0.00040002,  0.00040004,  0.00040004]), 'split3_test_score': array([ 0.8,  0.8,  1. ]), 'mean_train_score': array([ 0.87272727,  0.81818182,  1.        ]), 'split1_test_score': array([ 1.,  1.,  1.])}

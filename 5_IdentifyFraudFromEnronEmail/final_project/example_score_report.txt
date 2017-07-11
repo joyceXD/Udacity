@@ -6,8 +6,8 @@
 									fill_value = ?), 
 
 'param_gamma': masked_array(data = [0.001 0.0001 0.001 0.0001 0.001 0.0001 0.001 0.0001],
-		 				 mask = [False False False False False False False False],
-   						 fill_value = ?),
+			 				mask = [False False False False False False False False],
+			 				fill_value = ?),
 
 'param_C': masked_array(data = [10 10 10 10 100 100 100 100],
 						 mask = [False False False False False False False False],
