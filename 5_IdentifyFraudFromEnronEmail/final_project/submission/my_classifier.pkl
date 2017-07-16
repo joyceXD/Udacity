@@ -54,9 +54,9 @@ sS'class_weight'
 p22
 (dp23
 I0
-F0.2
+F0.1
 sI1
-F0.8
+F0.9
 ssS'shrinking'
 p24
 I01
